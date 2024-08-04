@@ -18,7 +18,6 @@ const InstructorSchema = new Schema({
   title: { type: String },
   education: { type: String },
   experience: { type: Number },
-  profilePicture: { type: String },
   bio: { type: String },
   courses: [{ type: Schema.Types.ObjectId, ref: "Course" }],
 });

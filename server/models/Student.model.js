@@ -3,7 +3,7 @@ import mongoose, { Schema } from "mongoose";
 const StudentSchema = new Schema({
   firstname: { type: String, required: true },
   lastname: { type: String, required: true },
-  studentname: { type: String, required: true, unique: true },
+  username: { type: String, required: true, unique: true },
   email: {
     type: String,
     required: true,
@@ -17,9 +17,6 @@ const StudentSchema = new Schema({
   },
   password: { type: String, required: true },
   enrolledCourses: [{ type: Schema.Types.ObjectId, ref: "Course" }],
-  profilePicture: { type: String },
-  resetPasswordToken: String,
-  resetPasswordExpire: Date,
 });
 
 export default mongoose.model("Student", StudentSchema);

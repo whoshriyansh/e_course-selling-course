@@ -1,112 +1,128 @@
-import express from "express";
-import passport from "passport";
-import "../config/passport.js";
-import crypto from "crypto";
-import nodemailer from "nodemailer";
 import Student from "../models/Student.model.js";
-const router = express.Router();
+import Admin from "../models/Admin.model.js";
+import Instructor from "../models/Instructor.model.js";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { createError } from "../middleware/Error.js";
+import { generateToken } from "../utils/GenerateToken.js";
 
-router.get(
-  "/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
-);
-
-router.get(
-  "/google/callback",
-  passport.authenticate("google", {
-    successRedirect: "/",
-    failureRedirect: "/login",
-  })
-);
-
-router.get(
-  "/facebook",
-  passport.authenticate("facebook", { scope: ["email"] })
-);
-
-router.get(
-  "/facebook/callback",
-  passport.authenticate("facebook", {
-    successRedirect: "/",
-    failureRedirect: "/login",
-  })
-);
-
-export default router;
-
-export const forgotPassword = async (req, res, next) => {
-  const { email } = req.body;
+/*STUDENT AUTH CONTROLLERS*/
+// Student Sign-up
+export const StudentSignup = async (req, res, next) => {
   try {
-    const student = await Student.findOne({ email });
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
-    }
+    const salt = bcrypt.genSaltSync(10);
+    const hash = bcrypt.hashSync(req.body.password, salt);
+    const newStudent = new Student({ ...req.body, password: hash });
 
-    const resetToken = crypto.randomBytes(20).toString("hex");
-    student.resetPasswordToken = crypto
-      .createHash("sha256")
-      .update(resetToken)
-      .digest("hex");
-    student.resetPasswordExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
-    await student.save();
-
-    const resetUrl = `http://localhost:3000/passwordreset/${resetToken}`;
-    const message = `
-      <h1>You have requested a password reset</h1>
-      <p>Please go to this link to reset your password</p>
-      <a href=${resetUrl} clicktracking=off>${resetUrl}</a>
-    `;
-
-    const transporter = nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE,
-      auth: {
-        student: process.env.EMAIL_USERNAME,
-        pass: process.env.EMAIL_PASSWORD,
-      },
-    });
-
-    const mailOptions = {
-      from: process.env.EMAIL_FROM,
-      to: student.email,
-      subject: "Password Reset Request",
-      html: message,
-    };
-
-    transporter.sendMail(mailOptions);
-
-    res.status(200).json({ success: true, data: "Email Sent" });
-  } catch (error) {
-    student.resetPasswordToken = undefined;
-    student.resetPasswordExpire = undefined;
-    await student.save();
-    return next(error);
+    await newStudent.save();
+    res.status(200).send("Student has been created");
+    // const token = generateToken(newStudent, "student");
+    res.status(200).json({ token });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const resetPassword = async (req, res, next) => {
-  const resetPasswordToken = crypto
-    .createHash("sha256")
-    .update(req.params.resetToken)
-    .digest("hex");
+// Student Sign-in
+export const StudentSignin = async (req, res, next) => {
   try {
-    const student = await Student.findOne({
-      resetPasswordToken,
-      resetPasswordExpire: { $gt: Date.now() },
-    });
+    const student = await Student.findOne({ email: req.body.email });
+    if (!student)
+      return next(
+        createError(404, "Student not found with this Email Address")
+      );
 
-    if (!student) {
-      return res.status(400).json({ message: "Invalid Token" });
-    }
+    const isCorrectPassword = await bcrypt.compare(
+      req.body.password,
+      student.password
+    );
+    if (!isCorrectPassword) return next(createError(404, "Wrong Password"));
 
-    student.password = req.body.password;
-    student.resetPasswordToken = undefined;
-    student.resetPasswordExpire = undefined;
-    await student.save();
+    const token = generateToken(student, "student");
+    const { password, ...others } = student._doc;
 
-    res
-      .status(201)
-      .json({ success: true, data: "Password Updated Successfully" });
-  } catch (error) {
-    next(error);
+    res.status(200).json({ ...others, token });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/*INSTRUCTOR AUTH CONTROLLERS*/
+// Instructor Sign-up
+export const InstructorSignup = async (req, res, next) => {
+  try {
+    const salt = bcrypt.genSaltSync(10);
+    const hash = bcrypt.hashSync(req.body.password, salt);
+    const newInstructor = new Instructor({ ...req.body, password: hash });
+
+    await newInstructor.save();
+    res.status(200).send("Instructor has been created");
+    // const token = generateToken(newInstructor, "instructor");
+    res.status(200).json({ token });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Instructor Sign-in
+export const InstructorSignin = async (req, res, next) => {
+  try {
+    const instructor = await Instructor.findOne({ email: req.body.email });
+    if (!instructor)
+      return next(
+        createError(404, "Instructor not found with this Email Address")
+      );
+
+    const isCorrectPassword = await bcrypt.compare(
+      req.body.password,
+      instructor.password
+    );
+    if (!isCorrectPassword) return next(createError(404, "Wrong Password"));
+
+    const token = generateToken(instructor, "instructor");
+    const { password, ...others } = instructor._doc;
+
+    res.status(200).json({ ...others, token });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/*ADMIN AUTH CONTROLLERS*/
+// Admin Sign-up
+export const AdminSignup = async (req, res, next) => {
+  try {
+    const salt = bcrypt.genSaltSync(10);
+    const hash = bcrypt.hashSync(req.body.password, salt);
+    const newAdmin = new Admin({ ...req.body, password: hash });
+
+    await newAdmin.save();
+    res.status(200).send("Adminn has been created");
+    // const token = generateToken(newAdmin, "admin");
+    res.status(200).json({ token });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// Admin Sign-in
+export const AdminSignin = async (req, res, next) => {
+  try {
+    const admin = await Admin.findOne({ email: req.body.email });
+    if (!admin)
+      return next(createError(404, "Admin not found with this Email Address"));
+
+    const isCorrectPassword = await bcrypt.compare(
+      req.body.password,
+      admin.password
+    );
+    if (!isCorrectPassword) return next(createError(404, "Wrong Password"));
+
+    const token = generateToken(admin, "admin");
+    const { password, ...others } = admin._doc;
+
+    res.status(200).json({ ...others, token });
+  } catch (err) {
+    next(err);
   }
 };
